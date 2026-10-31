@@ -182,6 +182,7 @@ Java_com_buddyapps_applewindroid_NativeCore_nativeInitialize(
     retro_set_audio_sample(audio_sample);
     retro_set_audio_sample_batch(audio_batch);
     retro_init();
+    retro_set_controller_port_device(0, RETRO_DEVICE_JOYPAD);
     g_initialized = true;
     return JNI_TRUE;
 }
