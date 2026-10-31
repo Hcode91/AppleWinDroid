@@ -12,4 +12,4 @@ To build locally, place `libapplewindroid_jni.so` and `libapplewin_libretro.so` 
 bash /root/.buddy/work/AppleWinDroid/android/app-shell/build-apk-with-native.sh
 ```
 
-The workflow compiles the ARM64 libraries and checks APK assembly on its runner, then discards the APK. It does not publish binaries because the current core build includes AppleWin ROM resources.
+The workflow compiles the ARM64 libraries, assembles and verifies the signed APK, then uploads it as the `AppleWinDroid-Android-arm64-apk` Actions artifact for 30 days. The APK includes the core's AppleWin ROM resources.
