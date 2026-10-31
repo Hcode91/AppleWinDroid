@@ -20,12 +20,14 @@ The native-core build pins the related [FujiNetWIFI/AppleWin `linux` branch](htt
 2. **Android build shell:** partial. The activity connects disk selection, video surfaces, and touch/physical joypad input to the JNI bridge. CI builds the ARM64 core and bridge. A local script assembles a signed APK when the native libraries are supplied. Audio and save states remain.
 3. **First boot:** connect the Apple II CPU, memory, disk, video, and audio core to Android. Support user-selected ROM and disk images without bundling copyrighted media. Add touch controls and physical keyboard/controller input.
 4. **Core features:** port configuration, save states, disk management, machine variants, cards, debugger, and remaining input/audio/video features. Track each feature against the Windows app before calling the port complete.
-5. **RetroAchievements:** replace the DLL bridge with the portable `rcheevos` client/runtime, implement Android HTTP transport and credential storage, expose the Apple II memory map, and draw an Android achievements overlay. Carry over AppleWin's game identification, hard-core restrictions, reset/media-change behavior, and achievement lifecycle.
+5. **RetroAchievements:** add casual/softcore unlocks through the portable `rcheevos` client/runtime, Android HTTP transport and credential storage, Apple II memory access, and an achievements overlay. The Android app must have no hardcore mode, toggle, setting, or enforcement path; unlocks are always casual/softcore.
 6. **Parity and release:** test supported machine types, disk formats, save-state behavior, controllers, and RetroAchievements online/offline flows on Android devices. Package repeatable signed builds without putting account credentials or signing keys in the repository.
 
 ## RetroAchievements constraints
 
 `rcheevos` provides achievement and leaderboard processing, hashing, and client/runtime helpers, but it does not perform HTTP requests. The Android port therefore needs its own network transport and UI. The current `RAInterface` DLL loader remains useful as a reference for AppleWin's existing lifecycle behavior, but not as the Android implementation. See the official [rcheevos integration overview](https://github.com/RetroAchievements/rcheevos#runtime-support).
+
+The Android achievement client is casual/softcore only. Do not add a hardcore flag, mode selector, enforcement checks, or a path that could enable hardcore. The Windows implementation's hardcore behavior is out of scope for Android.
 
 ## First implementation target
 

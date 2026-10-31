@@ -23,10 +23,17 @@ jobs:
       - name: Check out the AppleWin core submodule
         run: git submodule update --init android/applewin-core
 
+      - name: Enforce casual-only Android achievements
+        run: |
+          if rg -ni 'hard.?core' android/app-shell/java android/app-shell/native; then
+            echo "Android achievements must remain casual/softcore only."
+            exit 1
+          fi
+
       - name: Install host build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libboost-dev pkg-config xxd
+          sudo apt-get install -y libboost-dev pkg-config xxd ripgrep
 
       - name: Install Android NDK and CMake
         uses: android-actions/setup-android@v4
@@ -34,7 +41,7 @@ jobs:
           packages: ''
 
       - name: Install Android NDK and CMake packages
-        run: sdkmanager --install "ndk;27.2.12479018" "cmake;3.31.6"
+        run: sdkmanager --install "ndk;27.2.12479018" "cmake;3.31.6" "platforms;android-36" "build-tools;36.0.0"
 
       - name: Configure ARM64 core
         run: |
@@ -103,3 +110,18 @@ jobs:
 
       - name: Compile libretro core
         run: cmake --build build-android-core --target applewin_libretro applewindroid_jni --parallel 2
+
+      - name: Assemble and verify native APK (not published)
+        run: |
+          BUILD_TOOLS="$ANDROID_HOME/build-tools/36.0.0"
+          echo "$BUILD_TOOLS" >> "$GITHUB_PATH"
+          export PATH="$BUILD_TOOLS:$PATH"
+          export SDK_JAR="$ANDROID_HOME/platforms/android-36/android.jar"
+          export APP_KEY_DIR="$RUNNER_TEMP/applewindroid-keys"
+          mkdir -p "$RUNNER_TEMP/native-libs/arm64-v8a"
+          CORE_SO=$(find build-android-core -name applewin_libretro.so -print -quit)
+          JNI_SO=$(find build-android-core -name libapplewindroid_jni.so -print -quit)
+          test -n "$CORE_SO" && test -n "$JNI_SO"
+          cp "$CORE_SO" "$RUNNER_TEMP/native-libs/arm64-v8a/libapplewin_libretro.so"
+          cp "$JNI_SO" "$RUNNER_TEMP/native-libs/arm64-v8a/libapplewindroid_jni.so"
+          bash android/app-shell/build-apk-with-native.sh "$RUNNER_TEMP/native-libs/arm64-v8a"

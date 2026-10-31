@@ -3,8 +3,8 @@ set -eu
 
 PROJECT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 NATIVE_DIR=${1:-"$PROJECT_DIR/native-libs/arm64-v8a"}
-SKILL_BUILD=/root/.buddy/work/.claude/skills/android-app/build-apk.sh
-KEY_DIR=/root/.buddy/keys
+JAVA_BUILD=${JAVA_APK_BUILDER:-"$PROJECT_DIR/build-java-apk.sh"}
+KEY_DIR=${APP_KEY_DIR:-/root/.buddy/keys}
 OUT_DIR="$PROJECT_DIR/build"
 BASE_APK="$OUT_DIR/app.apk"
 PACKED_APK="$OUT_DIR/app-with-native-unsigned.apk"
@@ -17,7 +17,7 @@ for library in libapplewindroid_jni.so libapplewin_libretro.so; do
   fi
 done
 
-bash "$SKILL_BUILD" "$PROJECT_DIR"
+bash "$JAVA_BUILD" "$PROJECT_DIR"
 python3 - "$BASE_APK" "$PACKED_APK" "$NATIVE_DIR" <<'PY'
 import sys
 import zipfile
@@ -41,7 +41,6 @@ apksigner sign \
   --ks "$KEY_DIR/apps.jks" \
   --ks-key-alias apps \
   --ks-pass "file:$KEY_DIR/password" \
-  --key-pass "file:$KEY_DIR/password" \
   --out "$BASE_APK" "$PACKED_APK"
 apksigner verify "$BASE_APK"
 rm -f "$PACKED_APK"
