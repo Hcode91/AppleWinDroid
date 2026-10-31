@@ -2,7 +2,7 @@
 
 ## Current status
 
-This fork is based on `RetroAchievements/AppleWin`. It now has an Android Java app shell, a disk image picker, and a JNI host bridge source for core lifecycle, disk loading, video surfaces, and joypad input. The GitHub Actions build is being extended to compile the ARM64 libretro core with that bridge. The APK builder and activity do not yet package or call the native libraries. The original AppleWin host layer is tightly coupled to Windows APIs: the source tree contains 94 C++ files and hundreds of uses of Win32 window, input, sound, and drawing APIs. `source/StdAfx.h` includes Windows multimedia and UI headers for the MSVC build.
+This fork is based on `RetroAchievements/AppleWin`. It now has an Android Java app shell, a disk image picker, and a JNI host bridge for core lifecycle, disk loading, video surfaces, and joypad input. GitHub Actions successfully compiles the ARM64 libretro core and JNI bridge. The APK builder and activity do not yet package or call the native libraries. The original AppleWin host layer is tightly coupled to Windows APIs: the source tree contains 94 C++ files and hundreds of uses of Win32 window, input, sound, and drawing APIs. `source/StdAfx.h` includes Windows multimedia and UI headers for the MSVC build.
 
 The RetroAchievements path is also Windows-specific. AppleWin's `RAInterface` submodule loads `RA_Integration.dll` with `LoadLibraryW`, exposes `HWND` and Win32 menu/render APIs, and downloads the integration DLL. That interface cannot be used as-is by an Android app.
 
