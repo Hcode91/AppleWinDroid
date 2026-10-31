@@ -41,8 +41,8 @@ jobs:
           # CMake's Android-aware finder so the NDK sysroot supplies zlib.
           python3 - <<'PY'
           from pathlib import Path
-          path = Path("android/applewin-core/source/CMakeLists.txt")
-          source = path.read_text()
+          source_path = Path("android/applewin-core/source/CMakeLists.txt")
+          source = source_path.read_text()
           source = source.replace(
               "pkg_search_module(ZLIB REQUIRED zlib)",
               "find_package(ZLIB REQUIRED)",
@@ -51,11 +51,26 @@ jobs:
           source = source.replace(
               "find_package(Boost REQUIRED)",
               "include_directories(/usr/include)",
-              1,
           )
-          path.write_text(source)
+          source_path.write_text(source)
+
+          common_path = Path("android/applewin-core/source/frontends/common2/CMakeLists.txt")
+          common = common_path.read_text().replace(
+              "find_package(Boost REQUIRED)",
+              "include_directories(/usr/include)",
+          )
+          common_path.write_text(common)
           PY
-          cmake -S android/applewin-core -B build-android-core             -DCMAKE_TOOLCHAIN_FILE="$ANDROID_HOME/ndk/27.2.12479018/build/cmake/android.toolchain.cmake"             -DANDROID_ABI=arm64-v8a             -DANDROID_PLATFORM=android-26             -DCMAKE_BUILD_TYPE=Release             -DBUILD_APPLEN=OFF             -DBUILD_QAPPLE=OFF             -DBUILD_SA2=OFF             -DBUILD_LIBRETRO=ON             -DENABLE_NETWORKING=OFF
+          cmake -S android/applewin-core -B build-android-core \
+            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_HOME/ndk/27.2.12479018/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-26 \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_APPLEN=OFF \
+            -DBUILD_QAPPLE=OFF \
+            -DBUILD_SA2=OFF \
+            -DBUILD_LIBRETRO=ON \
+            -DENABLE_NETWORKING=OFF
 
       - name: Compile libretro core
         run: cmake --build build-android-core --target applewin_libretro --parallel 2
