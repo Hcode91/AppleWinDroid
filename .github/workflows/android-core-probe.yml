@@ -111,7 +111,7 @@ jobs:
       - name: Compile libretro core
         run: cmake --build build-android-core --target applewin_libretro applewindroid_jni --parallel 2
 
-      - name: Assemble and verify native APK (not published)
+      - name: Assemble and verify native APK
         run: |
           BUILD_TOOLS="$ANDROID_HOME/build-tools/36.0.0"
           echo "$BUILD_TOOLS" >> "$GITHUB_PATH"
@@ -125,3 +125,11 @@ jobs:
           cp "$CORE_SO" "$RUNNER_TEMP/native-libs/arm64-v8a/libapplewin_libretro.so"
           cp "$JNI_SO" "$RUNNER_TEMP/native-libs/arm64-v8a/libapplewindroid_jni.so"
           bash android/app-shell/build-apk-with-native.sh "$RUNNER_TEMP/native-libs/arm64-v8a"
+
+      - name: Upload verified Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: AppleWinDroid-Android-arm64-apk
+          path: android/app-shell/build/app.apk
+          if-no-files-found: error
+          retention-days: 30
