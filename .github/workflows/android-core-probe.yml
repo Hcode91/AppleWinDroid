@@ -69,8 +69,7 @@ jobs:
           libretro_path = Path("android/applewin-core/source/frontends/libretro/CMakeLists.txt")
           libretro = libretro_path.read_text().replace(
               "  libretro-common/include",
-              "  libretro-common/include
-  ${Boost_INCLUDE_DIRS}",
+              "  libretro-common/include" + chr(10) + "  ${Boost_INCLUDE_DIRS}",
               1,
           )
           libretro_path.write_text(libretro)
