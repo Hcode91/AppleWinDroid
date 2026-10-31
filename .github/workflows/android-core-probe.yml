@@ -74,6 +74,12 @@ jobs:
               include_block + chr(10) + f"  {boost_headers}",
               1,
           )
+          link_block = "target_link_libraries(applewin_libretro PRIVATE" + chr(10) + "  appleii" + chr(10) + "  common2"
+          libretro = libretro.replace(
+              link_block,
+              link_block + chr(10) + "  ZLIB::ZLIB",
+              1,
+          )
           libretro_path.write_text(libretro)
           PY
           cmake -S android/applewin-core -B build-android-core \
