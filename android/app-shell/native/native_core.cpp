@@ -9,6 +9,7 @@
 #include <atomic>
 #include <cstdarg>
 #include <cstdint>
+#include <cstdlib>
 #include <map>
 #include <mutex>
 #include <string>
@@ -175,6 +176,19 @@ Java_com_buddyapps_applewindroid_NativeCore_nativeInitialize(
     if (g_initialized) return JNI_TRUE;
     g_save_directory = from_java(env, save_directory);
     g_system_directory = from_java(env, system_directory);
+    // AppleWin's Linux frontend resolves its configuration directory from
+    // HOME. Android does not guarantee HOME is set, so Game construction can
+    // otherwise throw before any disk image is examined.
+    const size_t separator = g_save_directory.find_last_of('/');
+    const std::string app_files_directory = separator == std::string::npos
+            ? g_save_directory : g_save_directory.substr(0, separator);
+    const std::string config_directory = app_files_directory + "/config";
+    if (app_files_directory.empty()
+            || setenv("HOME", app_files_directory.c_str(), 1) != 0
+            || setenv("XDG_CONFIG_HOME", config_directory.c_str(), 1) != 0) {
+        log_message(ANDROID_LOG_ERROR, "Unable to configure app-private HOME for AppleWin");
+        return JNI_FALSE;
+    }
     retro_set_environment(environment);
     retro_set_video_refresh(refresh_video);
     retro_set_input_poll(input_poll);
