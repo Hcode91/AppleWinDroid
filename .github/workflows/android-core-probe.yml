@@ -91,15 +91,15 @@ jobs:
           if native_subdir not in root_cmake:
               root_cmake_path.write_text(root_cmake + chr(10) + native_subdir + chr(10))
           PY
-          cmake -S android/applewin-core -B build-android-core \\
-            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_HOME/ndk/27.2.12479018/build/cmake/android.toolchain.cmake" \\
-            -DANDROID_ABI=arm64-v8a \\
-            -DANDROID_PLATFORM=android-26 \\
-            -DCMAKE_BUILD_TYPE=Release \\
-            -DBUILD_APPLEN=OFF \\
-            -DBUILD_QAPPLE=OFF \\
-            -DBUILD_SA2=OFF \\
-            -DBUILD_LIBRETRO=ON \\
+          cmake -S android/applewin-core -B build-android-core \
+            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_HOME/ndk/27.2.12479018/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-26 \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_APPLEN=OFF \
+            -DBUILD_QAPPLE=OFF \
+            -DBUILD_SA2=OFF \
+            -DBUILD_LIBRETRO=ON \
             -DENABLE_NETWORKING=OFF
 
       - name: Compile libretro core
