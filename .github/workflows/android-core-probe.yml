@@ -18,8 +18,9 @@ jobs:
     steps:
       - name: Check out AppleWinDroid and its core source
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
+
+      - name: Check out the AppleWin core submodule
+        run: git submodule update --init android/applewin-core
 
       - name: Install host build dependencies
         run: |
@@ -27,11 +28,12 @@ jobs:
           sudo apt-get install -y libboost-dev pkg-config xxd
 
       - name: Install Android NDK and CMake
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
         with:
-          packages: |
-            ndk;27.2.12479018
-            cmake;3.31.6
+          packages: ''
+
+      - name: Install Android NDK and CMake packages
+        run: sdkmanager --install "ndk;27.2.12479018" "cmake;3.31.6"
 
       - name: Configure ARM64 core
         run: |
