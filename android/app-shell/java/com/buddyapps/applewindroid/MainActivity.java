@@ -1,6 +1,9 @@
 package com.buddyapps.applewindroid;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Intent;
 import android.database.Cursor;
 import android.graphics.Color;
@@ -19,6 +22,7 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -46,6 +50,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     private SurfaceView emulatorSurface;
     private volatile boolean coreInitialized;
     private volatile boolean gameLoaded;
+    private volatile String lastJavaError = "";
     private ScheduledFuture<?> frameTask;
 
     @Override
@@ -104,6 +109,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         diskStatus = new TextView(this);
         diskStatus.setTextColor(Color.WHITE);
         diskStatus.setTextSize(14);
+        diskStatus.setOnClickListener(view -> showDiagnostics());
         root.addView(diskStatus, new LinearLayout.LayoutParams(-1, -2));
 
         Button chooseDisk = new Button(this);
@@ -225,13 +231,41 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                         diskStatus.setText("Running: " + diskImage.getName());
                         startFrames();
                     } else {
-                        diskStatus.setText("Could not load: " + diskImage.getName());
+                        diskStatus.setText("Could not load: " + diskImage.getName() + " · tap for debug log");
                     }
                 });
             } catch (Throwable error) {
-                mainHandler.post(() -> diskStatus.setText("Native libraries are missing or the core could not start"));
+                lastJavaError = error.getClass().getSimpleName() + ": " + error.getMessage();
+                mainHandler.post(() -> diskStatus.setText("Core startup error · tap for debug log"));
             }
         });
+    }
+
+    private void showDiagnostics() {
+        String details;
+        try {
+            details = NativeCore.nativeGetDiagnostics();
+        } catch (Throwable error) {
+            details = "Could not read native diagnostics: " + error;
+        }
+        if (!lastJavaError.isEmpty()) details += "\nJava error: " + lastJavaError;
+        final String debugLog = details;
+        TextView content = new TextView(this);
+        content.setText(debugLog.isEmpty() ? "No diagnostics recorded yet." : debugLog);
+        content.setTextIsSelectable(true);
+        content.setPadding(dp(16), dp(12), dp(16), dp(12));
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(content);
+        new AlertDialog.Builder(this)
+                .setTitle("AppleWin debug log")
+                .setView(scroll)
+                .setPositiveButton("Copy log", (dialog, which) -> {
+                    ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                    clipboard.setPrimaryClip(ClipData.newPlainText("AppleWin debug log", debugLog));
+                    Toast.makeText(this, "Debug log copied", Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton("Close", null)
+                .show();
     }
 
     private void startFrames() {
