@@ -7,10 +7,17 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
 import android.provider.OpenableColumns;
 import android.view.Gravity;
+import android.view.KeyEvent;
+import android.view.MotionEvent;
+import android.view.Surface;
+import android.view.SurfaceHolder;
+import android.view.SurfaceView;
 import android.view.View;
 import android.widget.Button;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -20,10 +27,26 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
-public final class MainActivity extends Activity {
+public final class MainActivity extends Activity implements SurfaceHolder.Callback {
     private static final int PICK_DISK_IMAGE = 1001;
+    private static final int BUTTON_B = 0;
+    private static final int BUTTON_A = 8;
+    private static final int BUTTON_DOWN = 13;
+    private static final int BUTTON_LEFT = 14;
+    private static final int BUTTON_RIGHT = 15;
+    private static final int BUTTON_UP = 12;
+
+    private final Handler mainHandler = new Handler();
+    private final ScheduledThreadPoolExecutor coreExecutor = new ScheduledThreadPoolExecutor(1);
     private TextView diskStatus;
+    private SurfaceView emulatorSurface;
+    private volatile boolean coreInitialized;
+    private volatile boolean gameLoaded;
+    private ScheduledFuture<?> frameTask;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -43,31 +66,39 @@ public final class MainActivity extends Activity {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setGravity(Gravity.CENTER_HORIZONTAL);
-        root.setPadding(dp(24), dp(18), dp(24), dp(18));
+        root.setPadding(dp(20), dp(10), dp(20), dp(10));
         root.setBackgroundColor(Color.rgb(16, 19, 25));
 
         TextView title = new TextView(this);
         title.setText("AppleWinDroid");
         title.setTextColor(Color.WHITE);
-        title.setTextSize(26);
+        title.setTextSize(22);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         root.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
-        TextView subtitle = new TextView(this);
-        subtitle.setText("Apple II emulator for Android");
-        subtitle.setTextColor(Color.rgb(172, 184, 201));
-        subtitle.setTextSize(14);
-        root.addView(subtitle, new LinearLayout.LayoutParams(-1, -2));
-
-        TextView display = new TextView(this);
-        display.setText("Android display is ready\n\nThe Apple II core is not connected yet.");
-        display.setTextColor(Color.rgb(191, 204, 220));
-        display.setTextSize(18);
-        display.setGravity(Gravity.CENTER);
-        display.setBackgroundColor(Color.rgb(4, 7, 10));
+        FrameLayout display = new FrameLayout(this);
+        display.setBackgroundColor(Color.BLACK);
+        emulatorSurface = new SurfaceView(this);
+        emulatorSurface.getHolder().addCallback(this);
+        display.addView(emulatorSurface, new FrameLayout.LayoutParams(-1, -1));
+        LinearLayout controls = new LinearLayout(this);
+        controls.setGravity(Gravity.CENTER_VERTICAL);
+        controls.setPadding(dp(8), dp(4), dp(8), dp(4));
+        controls.setBackgroundColor(0x99000000);
+        addControl(controls, "↑", BUTTON_UP);
+        addControl(controls, "←", BUTTON_LEFT);
+        addControl(controls, "↓", BUTTON_DOWN);
+        addControl(controls, "→", BUTTON_RIGHT);
+        View spacer = new View(this);
+        controls.addView(spacer, new LinearLayout.LayoutParams(0, 1, 1f));
+        addControl(controls, "B", BUTTON_B);
+        addControl(controls, "A", BUTTON_A);
+        FrameLayout.LayoutParams controlsParams = new FrameLayout.LayoutParams(
+                -1, -2, Gravity.BOTTOM);
+        display.addView(controls, controlsParams);
         LinearLayout.LayoutParams displayParams = new LinearLayout.LayoutParams(-1, 0, 1f);
-        displayParams.topMargin = dp(16);
-        displayParams.bottomMargin = dp(16);
+        displayParams.topMargin = dp(8);
+        displayParams.bottomMargin = dp(8);
         root.addView(display, displayParams);
 
         diskStatus = new TextView(this);
@@ -78,17 +109,36 @@ public final class MainActivity extends Activity {
         Button chooseDisk = new Button(this);
         chooseDisk.setText("Choose disk image");
         chooseDisk.setOnClickListener(view -> openDiskPicker());
-        LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(-1, -2);
-        buttonParams.topMargin = dp(8);
-        root.addView(chooseDisk, buttonParams);
+        root.addView(chooseDisk, new LinearLayout.LayoutParams(-1, -2));
 
         TextView note = new TextView(this);
-        note.setText("Supports selecting .dsk, .do, and .po images. Emulation and controls are not connected yet.");
+        note.setText("Touch controls are shown over the screen. Audio and save states are not connected yet.");
         note.setTextColor(Color.rgb(172, 184, 201));
         note.setTextSize(12);
         note.setGravity(Gravity.CENTER);
         root.addView(note, new LinearLayout.LayoutParams(-1, -2));
         return root;
+    }
+
+    private void addControl(LinearLayout parent, String label, int button) {
+        Button control = new Button(this);
+        control.setText(label);
+        control.setOnTouchListener((view, event) -> {
+            if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                setButton(button, true);
+                return true;
+            }
+            if (event.getAction() == MotionEvent.ACTION_UP || event.getAction() == MotionEvent.ACTION_CANCEL) {
+                setButton(button, false);
+                return true;
+            }
+            return true;
+        });
+        parent.addView(control, new LinearLayout.LayoutParams(dp(52), dp(48)));
+    }
+
+    private void setButton(int button, boolean pressed) {
+        if (coreInitialized) NativeCore.nativeSetButton(button, pressed);
     }
 
     private void openDiskPicker() {
@@ -116,6 +166,7 @@ public final class MainActivity extends Activity {
                     .putString("disk_name", displayName)
                     .apply();
             showDisk(displayName, savedFile);
+            startGame(savedFile);
         } catch (Exception error) {
             Toast.makeText(this, "Could not open that disk image", Toast.LENGTH_LONG).show();
         }
@@ -127,9 +178,7 @@ public final class MainActivity extends Activity {
                 int column = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
                 if (column >= 0) {
                     String name = cursor.getString(column);
-                    if (name != null && !name.trim().isEmpty()) {
-                        return name;
-                    }
+                    if (name != null && !name.trim().isEmpty()) return name;
                 }
             }
         }
@@ -142,41 +191,133 @@ public final class MainActivity extends Activity {
             throw new IllegalStateException("Unable to create disk image storage");
         }
         String safeName = displayName.replaceAll("[^A-Za-z0-9._-]", "_");
-        String uniqueName = UUID.randomUUID().toString().substring(0, 8) + "-" + safeName;
-        File destination = new File(directory, uniqueName);
+        File destination = new File(directory, UUID.randomUUID().toString().substring(0, 8) + "-" + safeName);
         try (InputStream input = getContentResolver().openInputStream(uri);
              FileOutputStream output = new FileOutputStream(destination)) {
-            if (input == null) {
-                throw new IllegalStateException("No data returned for disk image");
-            }
+            if (input == null) throw new IllegalStateException("No data returned for disk image");
             byte[] buffer = new byte[32 * 1024];
             int count;
-            while ((count = input.read(buffer)) != -1) {
-                output.write(buffer, 0, count);
-            }
+            while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
             output.getFD().sync();
         }
         return destination;
     }
 
+    private void startGame(File diskImage) {
+        diskStatus.setText("Starting " + diskImage.getName() + "…");
+        coreExecutor.execute(() -> {
+            try {
+                if (!coreInitialized) {
+                    File saves = new File(getFilesDir(), "saves");
+                    File system = new File(getFilesDir(), "system");
+                    saves.mkdirs();
+                    system.mkdirs();
+                    if (!NativeCore.nativeInitialize(saves.getAbsolutePath(), system.getAbsolutePath())) {
+                        throw new IllegalStateException("Native core initialization failed");
+                    }
+                    coreInitialized = true;
+                    Surface surface = emulatorSurface.getHolder().getSurface();
+                    if (surface != null && surface.isValid()) NativeCore.nativeSetSurface(surface);
+                }
+                gameLoaded = NativeCore.nativeLoadGame(diskImage.getAbsolutePath());
+                mainHandler.post(() -> {
+                    if (gameLoaded) {
+                        diskStatus.setText("Running: " + diskImage.getName());
+                        startFrames();
+                    } else {
+                        diskStatus.setText("Could not load: " + diskImage.getName());
+                    }
+                });
+            } catch (Throwable error) {
+                mainHandler.post(() -> diskStatus.setText("Native libraries are missing or the core could not start"));
+            }
+        });
+    }
+
+    private void startFrames() {
+        if (frameTask != null && !frameTask.isCancelled()) return;
+        frameTask = coreExecutor.scheduleAtFixedRate(
+                () -> {
+                    if (gameLoaded) NativeCore.nativeRunFrame();
+                }, 0, 16, TimeUnit.MILLISECONDS);
+    }
+
     private void showSavedDisk() {
         String path = getPreferences(MODE_PRIVATE).getString("disk_path", null);
         String name = getPreferences(MODE_PRIVATE).getString("disk_name", null);
-        if (path == null || name == null) {
+        if (path == null || name == null || !new File(path).isFile()) {
             diskStatus.setText("No disk image selected");
             return;
         }
         File file = new File(path);
-        if (file.isFile()) {
-            showDisk(name, file);
-        } else {
-            diskStatus.setText("No disk image selected");
-        }
+        String size = String.format(Locale.getDefault(), "%.1f MB", file.length() / (1024.0 * 1024.0));
+        diskStatus.setText("Selected: " + name + " (" + size + ")");
     }
 
     private void showDisk(String name, File file) {
         String size = String.format(Locale.getDefault(), "%.1f MB", file.length() / (1024.0 * 1024.0));
         diskStatus.setText("Selected: " + name + " (" + size + ")");
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (gameLoaded) startFrames();
+    }
+
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        int button = buttonForKey(event.getKeyCode());
+        if (button >= 0) {
+            setButton(button, event.getAction() == KeyEvent.ACTION_DOWN);
+            return true;
+        }
+        return super.dispatchKeyEvent(event);
+    }
+
+    private int buttonForKey(int keyCode) {
+        switch (keyCode) {
+            case KeyEvent.KEYCODE_DPAD_LEFT: return BUTTON_LEFT;
+            case KeyEvent.KEYCODE_DPAD_RIGHT: return BUTTON_RIGHT;
+            case KeyEvent.KEYCODE_DPAD_UP: return BUTTON_UP;
+            case KeyEvent.KEYCODE_DPAD_DOWN: return BUTTON_DOWN;
+            case KeyEvent.KEYCODE_BUTTON_A: return BUTTON_A;
+            case KeyEvent.KEYCODE_BUTTON_B: return BUTTON_B;
+            default: return -1;
+        }
+    }
+
+    @Override
+    public void surfaceCreated(SurfaceHolder holder) {
+        if (coreInitialized) NativeCore.nativeSetSurface(holder.getSurface());
+    }
+
+    @Override
+    public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+        if (coreInitialized) NativeCore.nativeSetSurface(holder.getSurface());
+    }
+
+    @Override
+    public void surfaceDestroyed(SurfaceHolder holder) {
+        if (coreInitialized) NativeCore.nativeSetSurface(null);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (frameTask != null) {
+            frameTask.cancel(false);
+            frameTask = null;
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        coreExecutor.execute(() -> {
+            if (coreInitialized) NativeCore.nativeStop();
+        });
+        coreExecutor.shutdown();
+        super.onDestroy();
     }
 
     private int dp(int value) {

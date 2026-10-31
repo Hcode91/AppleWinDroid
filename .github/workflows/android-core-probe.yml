@@ -6,8 +6,7 @@ on:
     paths:
       - ".gitmodules"
       - "android/applewin-core"
-      - "android/app-shell/native/**"
-      - "android/app-shell/java/**"
+      - "android/app-shell/**"
       - ".github/workflows/android-core-probe.yml"
 
 permissions:
