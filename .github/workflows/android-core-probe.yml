@@ -1,0 +1,63 @@
+name: Android AppleWin core probe
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".gitmodules"
+      - "android/applewin-core"
+      - ".github/workflows/android-core-probe.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-arm64-core:
+    name: Build AppleWin libretro core for Android ARM64
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out AppleWinDroid and its core source
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install host build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libboost-dev pkg-config xxd
+
+      - name: Install Android NDK and CMake
+        uses: android-actions/setup-android@v3
+        with:
+          packages: |
+            ndk;27.2.12479018
+            cmake;3.31.6
+
+      - name: Configure ARM64 core
+        run: |
+          # AppleWin's Linux port currently asks pkg-config for host zlib. Use
+          # CMake's Android-aware finder so the NDK sysroot supplies zlib.
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("android/applewin-core/source/CMakeLists.txt")
+          source = path.read_text()
+          source = source.replace(
+              "pkg_search_module(ZLIB REQUIRED zlib)",
+              "find_package(ZLIB REQUIRED)",
+              1,
+          )
+          path.write_text(source)
+          PY
+          cmake -S android/applewin-core -B build-android-core \
+            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_HOME/ndk/27.2.12479018/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-26 \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_APPLEN=OFF \
+            -DBUILD_QAPPLE=OFF \
+            -DBUILD_SA2=OFF \
+            -DBUILD_LIBRETRO=ON \
+            -DENABLE_NETWORKING=OFF
+
+      - name: Compile libretro core
+        run: cmake --build build-android-core --target applewin_libretro --parallel 2
