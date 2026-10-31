@@ -45,6 +45,7 @@ jobs:
           import shutil
           boost_headers = Path(os.environ["RUNNER_TEMP"]) / "boost-include"
           shutil.copytree("/usr/include/boost", boost_headers / "boost")
+
           source_path = Path("android/applewin-core/source/CMakeLists.txt")
           source = source_path.read_text()
           source = source.replace(
@@ -54,16 +55,25 @@ jobs:
           )
           source = source.replace(
               "find_package(Boost REQUIRED)",
-              f"include_directories({boost_headers})",
+              f'set(Boost_INCLUDE_DIRS "{boost_headers}")',
           )
           source_path.write_text(source)
 
           common_path = Path("android/applewin-core/source/frontends/common2/CMakeLists.txt")
           common = common_path.read_text().replace(
               "find_package(Boost REQUIRED)",
-              f"include_directories({boost_headers})",
+              f'set(Boost_INCLUDE_DIRS "{boost_headers}")',
           )
           common_path.write_text(common)
+
+          libretro_path = Path("android/applewin-core/source/frontends/libretro/CMakeLists.txt")
+          libretro = libretro_path.read_text().replace(
+              "  libretro-common/include",
+              "  libretro-common/include
+  ${Boost_INCLUDE_DIRS}",
+              1,
+          )
+          libretro_path.write_text(libretro)
           PY
           cmake -S android/applewin-core -B build-android-core \
             -DCMAKE_TOOLCHAIN_FILE="$ANDROID_HOME/ndk/27.2.12479018/build/cmake/android.toolchain.cmake" \
