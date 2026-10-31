@@ -1,3 +1,7 @@
 [submodule "RAInterface"]
 	path = RAInterface
 	url = https://github.com/RetroAchievements/RAInterface.git
+[submodule "android/applewin-core"]
+	path = android/applewin-core
+	url = https://github.com/FujiNetWIFI/AppleWin.git
+	branch = linux
