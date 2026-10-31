@@ -10,6 +10,7 @@ final class NativeCore {
 
     static native boolean nativeInitialize(String saveDirectory, String systemDirectory);
     static native boolean nativeLoadGame(String path);
+    static native String nativeGetDiagnostics();
     static native void nativeRunFrame();
     static native void nativeSetSurface(android.view.Surface surface);
     static native void nativeSetButton(int libretroButton, boolean pressed);
