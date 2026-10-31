@@ -48,19 +48,14 @@ jobs:
               "find_package(ZLIB REQUIRED)",
               1,
           )
+          source = source.replace(
+              "find_package(Boost REQUIRED)",
+              "include_directories(/usr/include)",
+              1,
+          )
           path.write_text(source)
           PY
-          cmake -S android/applewin-core -B build-android-core \
-            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_HOME/ndk/27.2.12479018/build/cmake/android.toolchain.cmake" \
-            -DANDROID_ABI=arm64-v8a \
-            -DANDROID_PLATFORM=android-26 \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_APPLEN=OFF \
-            -DBUILD_QAPPLE=OFF \
-            -DBUILD_SA2=OFF \
-            -DBUILD_LIBRETRO=ON \
-            -DENABLE_NETWORKING=OFF \
-            -DBoost_NO_BOOST_CMAKE=ON
+          cmake -S android/applewin-core -B build-android-core             -DCMAKE_TOOLCHAIN_FILE="$ANDROID_HOME/ndk/27.2.12479018/build/cmake/android.toolchain.cmake"             -DANDROID_ABI=arm64-v8a             -DANDROID_PLATFORM=android-26             -DCMAKE_BUILD_TYPE=Release             -DBUILD_APPLEN=OFF             -DBUILD_QAPPLE=OFF             -DBUILD_SA2=OFF             -DBUILD_LIBRETRO=ON             -DENABLE_NETWORKING=OFF
 
       - name: Compile libretro core
         run: cmake --build build-android-core --target applewin_libretro --parallel 2
