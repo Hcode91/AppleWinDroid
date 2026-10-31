@@ -59,7 +59,8 @@ jobs:
             -DBUILD_QAPPLE=OFF \
             -DBUILD_SA2=OFF \
             -DBUILD_LIBRETRO=ON \
-            -DENABLE_NETWORKING=OFF
+            -DENABLE_NETWORKING=OFF \
+            -DBoost_NO_BOOST_CMAKE=ON
 
       - name: Compile libretro core
         run: cmake --build build-android-core --target applewin_libretro --parallel 2
