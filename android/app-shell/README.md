@@ -2,7 +2,7 @@
 
 This plain Java activity provides the first Android-facing shell for AppleWinDroid. It opens Android's system document picker and copies a selected disk image into the app's private storage, ready for the native frontend to consume.
 
-The libretro ARM64 core currently builds in CI, but this shell does not yet load the core or emulate a disk. The next native frontend work must connect libretro callbacks to Android video, audio, input, and lifecycle APIs.
+The Android JNI host adapter now connects core lifecycle, disk loading, video frames, and joypad input to Android native APIs. CI compiles both the core and adapter. The simple Java APK builder does not yet package those native libraries, and the activity does not yet start the adapter; audio, touch controls, and app packaging integration remain future work.
 
 Build with the workspace Android app skill:
 

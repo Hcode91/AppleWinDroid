@@ -6,6 +6,8 @@ on:
     paths:
       - ".gitmodules"
       - "android/applewin-core"
+      - "android/app-shell/native/**"
+      - "android/app-shell/java/**"
       - ".github/workflows/android-core-probe.yml"
 
 permissions:
@@ -82,17 +84,23 @@ jobs:
               1,
           )
           libretro_path.write_text(libretro)
+
+          root_cmake_path = Path("android/applewin-core/CMakeLists.txt")
+          root_cmake = root_cmake_path.read_text()
+          native_subdir = 'add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/../app-shell/native" app-shell-native)'
+          if native_subdir not in root_cmake:
+              root_cmake_path.write_text(root_cmake + chr(10) + native_subdir + chr(10))
           PY
-          cmake -S android/applewin-core -B build-android-core \
-            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_HOME/ndk/27.2.12479018/build/cmake/android.toolchain.cmake" \
-            -DANDROID_ABI=arm64-v8a \
-            -DANDROID_PLATFORM=android-26 \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_APPLEN=OFF \
-            -DBUILD_QAPPLE=OFF \
-            -DBUILD_SA2=OFF \
-            -DBUILD_LIBRETRO=ON \
+          cmake -S android/applewin-core -B build-android-core \\
+            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_HOME/ndk/27.2.12479018/build/cmake/android.toolchain.cmake" \\
+            -DANDROID_ABI=arm64-v8a \\
+            -DANDROID_PLATFORM=android-26 \\
+            -DCMAKE_BUILD_TYPE=Release \\
+            -DBUILD_APPLEN=OFF \\
+            -DBUILD_QAPPLE=OFF \\
+            -DBUILD_SA2=OFF \\
+            -DBUILD_LIBRETRO=ON \\
             -DENABLE_NETWORKING=OFF
 
       - name: Compile libretro core
-        run: cmake --build build-android-core --target applewin_libretro --parallel 2
+        run: cmake --build build-android-core --target applewin_libretro applewindroid_jni --parallel 2
