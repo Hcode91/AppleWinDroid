@@ -44,6 +44,7 @@ jobs:
           import os
           import shutil
           boost_headers = Path(os.environ["RUNNER_TEMP"]) / "boost-include"
+          ndk_zlib = Path(os.environ["ANDROID_HOME"]) / "ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/26/libz.so"
           shutil.copytree("/usr/include/boost", boost_headers / "boost")
 
           source_path = Path("android/applewin-core/source/CMakeLists.txt")
@@ -77,7 +78,7 @@ jobs:
           link_block = "target_link_libraries(applewin_libretro PRIVATE" + chr(10) + "  appleii" + chr(10) + "  common2"
           libretro = libretro.replace(
               link_block,
-              link_block + chr(10) + "  ZLIB::ZLIB",
+              link_block + chr(10) + f"  {ndk_zlib}",
               1,
           )
           libretro_path.write_text(libretro)
