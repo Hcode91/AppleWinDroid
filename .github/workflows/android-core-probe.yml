@@ -77,6 +77,13 @@ jobs:
 
           libretro_path = Path("android/applewin-core/source/frontends/libretro/CMakeLists.txt")
           libretro = libretro_path.read_text()
+          # Android's linker needs the shared-object dependency name recorded
+          # in the JNI bridge to match the APK's native library filename.
+          # AppleWin's default libretro target has no "lib" prefix, which
+          # produces a JNI dependency that Android cannot resolve.
+          target_properties = 'set_target_properties(applewin_libretro PROPERTIES PREFIX "lib")'
+          if target_properties not in libretro:
+              libretro += chr(10) + target_properties + chr(10)
           include_block = "target_include_directories(applewin_libretro PRIVATE" + chr(10) + "  libretro-common/include"
           libretro = libretro.replace(
               include_block,
@@ -119,9 +126,10 @@ jobs:
           export SDK_JAR="$ANDROID_HOME/platforms/android-36/android.jar"
           export APP_KEY_DIR="$RUNNER_TEMP/applewindroid-keys"
           mkdir -p "$RUNNER_TEMP/native-libs/arm64-v8a"
-          CORE_SO=$(find build-android-core -name applewin_libretro.so -print -quit)
+          CORE_SO=$(find build-android-core -name libapplewin_libretro.so -print -quit)
           JNI_SO=$(find build-android-core -name libapplewindroid_jni.so -print -quit)
           test -n "$CORE_SO" && test -n "$JNI_SO"
+          llvm-readelf -d "$JNI_SO" | grep -F 'libapplewin_libretro.so'
           cp "$CORE_SO" "$RUNNER_TEMP/native-libs/arm64-v8a/libapplewin_libretro.so"
           cp "$JNI_SO" "$RUNNER_TEMP/native-libs/arm64-v8a/libapplewindroid_jni.so"
           bash android/app-shell/build-apk-with-native.sh "$RUNNER_TEMP/native-libs/arm64-v8a"
