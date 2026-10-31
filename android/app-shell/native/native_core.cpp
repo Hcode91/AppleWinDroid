@@ -8,19 +8,25 @@
 #include <algorithm>
 #include <atomic>
 #include <cstdarg>
+#include <cstdio>
 #include <cstdint>
 #include <cstdlib>
 #include <map>
 #include <mutex>
+#include <sstream>
 #include <string>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <vector>
 
 namespace {
 constexpr const char *kTag = "AppleWinDroid";
 ANativeWindow *g_window = nullptr;
 std::mutex g_mutex;
+std::mutex g_diagnostics_mutex;
 std::string g_save_directory;
 std::string g_system_directory;
+std::string g_diagnostics;
 std::map<std::string, std::string> g_options;
 std::atomic<uint16_t> g_buttons{0};
 bool g_initialized = false;
@@ -35,15 +41,28 @@ void log_message(int priority, const char *format, ...) {
     va_end(args);
 }
 
+void append_diagnostic(const std::string &message) {
+    std::lock_guard<std::mutex> lock(g_diagnostics_mutex);
+    g_diagnostics += message;
+    if (g_diagnostics.size() > 12000) {
+        const size_t trim_to = g_diagnostics.size() - 12000;
+        const size_t newline = g_diagnostics.find('\n', trim_to);
+        g_diagnostics.erase(0, newline == std::string::npos ? trim_to : newline + 1);
+    }
+}
+
 void core_log(enum retro_log_level level, const char *format, ...) {
     int priority = ANDROID_LOG_INFO;
     if (level == RETRO_LOG_WARN) priority = ANDROID_LOG_WARN;
     if (level == RETRO_LOG_ERROR) priority = ANDROID_LOG_ERROR;
     if (level == RETRO_LOG_DEBUG) priority = ANDROID_LOG_DEBUG;
+    char message[2048];
     va_list args;
     va_start(args, format);
-    __android_log_vprint(priority, kTag, format, args);
+    vsnprintf(message, sizeof(message), format, args);
     va_end(args);
+    __android_log_write(priority, kTag, message);
+    append_diagnostic(message);
 }
 
 std::string trim(std::string value) {
@@ -205,9 +224,22 @@ extern "C" JNIEXPORT jboolean JNICALL
 Java_com_buddyapps_applewindroid_NativeCore_nativeLoadGame(JNIEnv *env, jclass, jstring path) {
     if (!g_initialized || !path) return JNI_FALSE;
     const std::string game_path = from_java(env, path);
+    struct stat file_info{};
+    const bool exists = stat(game_path.c_str(), &file_info) == 0;
+    std::ostringstream diagnostics;
+    diagnostics << "Input file: exists=" << (exists ? "yes" : "no")
+                << ", readable=" << (access(game_path.c_str(), R_OK) == 0 ? "yes" : "no")
+                << ", bytes=" << (exists ? static_cast<long long>(file_info.st_size) : -1) << "\n";
+    {
+        std::lock_guard<std::mutex> lock(g_diagnostics_mutex);
+        g_diagnostics = diagnostics.str();
+    }
+    log_message(ANDROID_LOG_INFO, "Loading disk image (%lld bytes, exists=%d)",
+            exists ? static_cast<long long>(file_info.st_size) : -1LL, exists ? 1 : 0);
     retro_game_info game{};
     game.path = game_path.c_str();
     g_game_loaded = retro_load_game(&game);
+    append_diagnostic(std::string("retro_load_game returned ") + (g_game_loaded ? "true\n" : "false\n"));
     if (g_game_loaded) {
         retro_system_av_info av_info{};
         retro_get_system_av_info(&av_info);
@@ -220,6 +252,12 @@ Java_com_buddyapps_applewindroid_NativeCore_nativeLoadGame(JNIEnv *env, jclass, 
         }
     }
     return g_game_loaded ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_buddyapps_applewindroid_NativeCore_nativeGetDiagnostics(JNIEnv *env, jclass) {
+    std::lock_guard<std::mutex> lock(g_diagnostics_mutex);
+    return env->NewStringUTF(g_diagnostics.c_str());
 }
 
 extern "C" JNIEXPORT void JNICALL
