@@ -129,7 +129,7 @@ jobs:
           CORE_SO=$(find build-android-core -name libapplewin_libretro.so -print -quit)
           JNI_SO=$(find build-android-core -name libapplewindroid_jni.so -print -quit)
           test -n "$CORE_SO" && test -n "$JNI_SO"
-          llvm-readelf -d "$JNI_SO" | grep -F 'libapplewin_libretro.so'
+          readelf -d "$JNI_SO" | grep -F 'libapplewin_libretro.so'
           cp "$CORE_SO" "$RUNNER_TEMP/native-libs/arm64-v8a/libapplewin_libretro.so"
           cp "$JNI_SO" "$RUNNER_TEMP/native-libs/arm64-v8a/libapplewindroid_jni.so"
           bash android/app-shell/build-apk-with-native.sh "$RUNNER_TEMP/native-libs/arm64-v8a"
