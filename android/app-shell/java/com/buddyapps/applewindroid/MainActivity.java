@@ -67,19 +67,17 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         showSavedDisk();
     }
 
+    // Laid out like AppleWin on Windows: the Apple screen on the left and AppleWin's vertical
+    // toolbar on the right (Help, Run, Drive 1, Full screen, Debug, Setup) with the drive light.
+    private static final int BAR = 0xff2b2b2b, FACE = 0xff3c3c3c, EDGE = 0xff1a1a1a, LABEL = 0xffe6e6e6;
+    private View toolbar;
+    private View driveLight;
+    private boolean fullscreen;
+
     private View createContent() {
         LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setGravity(Gravity.CENTER_HORIZONTAL);
-        root.setPadding(dp(20), dp(10), dp(20), dp(10));
-        root.setBackgroundColor(Color.rgb(16, 19, 25));
-
-        TextView title = new TextView(this);
-        title.setText("AppleWinDroid");
-        title.setTextColor(Color.WHITE);
-        title.setTextSize(22);
-        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        root.addView(title, new LinearLayout.LayoutParams(-1, -2));
+        root.setOrientation(LinearLayout.HORIZONTAL);
+        root.setBackgroundColor(Color.BLACK);
 
         FrameLayout display = new FrameLayout(this);
         display.setBackgroundColor(Color.BLACK);
@@ -89,7 +87,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         LinearLayout controls = new LinearLayout(this);
         controls.setGravity(Gravity.CENTER_VERTICAL);
         controls.setPadding(dp(8), dp(4), dp(8), dp(4));
-        controls.setBackgroundColor(0x99000000);
+        controls.setBackgroundColor(0x66000000);
         addControl(controls, "↑", BUTTON_UP);
         addControl(controls, "←", BUTTON_LEFT);
         addControl(controls, "↓", BUTTON_DOWN);
@@ -98,32 +96,179 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         controls.addView(spacer, new LinearLayout.LayoutParams(0, 1, 1f));
         addControl(controls, "B", BUTTON_B);
         addControl(controls, "A", BUTTON_A);
-        FrameLayout.LayoutParams controlsParams = new FrameLayout.LayoutParams(
-                -1, -2, Gravity.BOTTOM);
-        display.addView(controls, controlsParams);
-        LinearLayout.LayoutParams displayParams = new LinearLayout.LayoutParams(-1, 0, 1f);
-        displayParams.topMargin = dp(8);
-        displayParams.bottomMargin = dp(8);
-        root.addView(display, displayParams);
+        display.addView(controls, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM));
+        root.addView(display, new LinearLayout.LayoutParams(0, -1, 1f));
 
+        ScrollView barScroll = new ScrollView(this);
+        barScroll.setBackgroundColor(BAR);
+        LinearLayout bar = new LinearLayout(this);
+        bar.setOrientation(LinearLayout.VERTICAL);
+        bar.setGravity(Gravity.CENTER_HORIZONTAL);
+        bar.setPadding(dp(6), dp(6), dp(6), dp(6));
+        bar.addView(toolButton("?", "Help", v -> showHelp()));
+        bar.addView(toolButton("▶", "Run", v -> runOrReboot()));
+        bar.addView(toolButton("1", "Drive 1", v -> openDiskPicker()));
+        bar.addView(toolButton("□", "Full screen", v -> setFullscreen(true)));
+        bar.addView(toolButton("🐞", "Debug", v -> showDiagnostics()));
+        bar.addView(toolButton("⚙", "Setup", v -> showSetup()));
+        LinearLayout lights = new LinearLayout(this);
+        lights.setGravity(Gravity.CENTER);
+        lights.setPadding(0, dp(10), 0, dp(4));
+        TextView driveLabel = new TextView(this);
+        driveLabel.setText("D1 ");
+        driveLabel.setTextColor(LABEL);
+        driveLabel.setTextSize(11);
+        lights.addView(driveLabel);
+        driveLight = new View(this);
+        lights.addView(driveLight, new LinearLayout.LayoutParams(dp(14), dp(8)));
+        bar.addView(lights);
         diskStatus = new TextView(this);
-        diskStatus.setTextColor(Color.WHITE);
-        diskStatus.setTextSize(14);
+        diskStatus.setTextColor(0xffa8b0bc);
+        diskStatus.setTextSize(10);
+        diskStatus.setGravity(Gravity.CENTER);
         diskStatus.setOnClickListener(view -> showDiagnostics());
-        root.addView(diskStatus, new LinearLayout.LayoutParams(-1, -2));
-
-        Button chooseDisk = new Button(this);
-        chooseDisk.setText("Choose disk image");
-        chooseDisk.setOnClickListener(view -> openDiskPicker());
-        root.addView(chooseDisk, new LinearLayout.LayoutParams(-1, -2));
-
-        TextView note = new TextView(this);
-        note.setText("Touch controls are shown over the screen. Audio and save states are not connected yet.");
-        note.setTextColor(Color.rgb(172, 184, 201));
-        note.setTextSize(12);
-        note.setGravity(Gravity.CENTER);
-        root.addView(note, new LinearLayout.LayoutParams(-1, -2));
+        bar.addView(diskStatus, new LinearLayout.LayoutParams(-1, -2));
+        barScroll.addView(bar);
+        toolbar = barScroll;
+        root.addView(barScroll, new LinearLayout.LayoutParams(dp(92), -1));
+        setDriveLight(false);
         return root;
+    }
+
+    /** One AppleWin toolbar button: a symbol over its name, on a raised dark face. */
+    private View toolButton(String symbol, String name, View.OnClickListener action) {
+        LinearLayout b = new LinearLayout(this);
+        b.setOrientation(LinearLayout.VERTICAL);
+        b.setGravity(Gravity.CENTER);
+        b.setFocusable(true);
+        b.setClickable(true);
+        b.setContentDescription(name);
+        android.graphics.drawable.StateListDrawable states = new android.graphics.drawable.StateListDrawable();
+        states.addState(new int[] { android.R.attr.state_pressed }, face(0xff5a5a5a, EDGE));
+        states.addState(new int[] { android.R.attr.state_focused }, face(FACE, 0xff3d8ee6));
+        states.addState(new int[0], face(FACE, EDGE));
+        b.setBackground(states);
+        TextView icon = new TextView(this);
+        icon.setText(symbol);
+        icon.setTextColor(Color.WHITE);
+        icon.setTextSize(20);
+        icon.setGravity(Gravity.CENTER);
+        b.addView(icon);
+        TextView label = new TextView(this);
+        label.setText(name);
+        label.setTextColor(LABEL);
+        label.setTextSize(10);
+        label.setGravity(Gravity.CENTER);
+        b.addView(label);
+        b.setOnClickListener(action);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, dp(56));
+        lp.setMargins(0, 0, 0, dp(6));
+        b.setLayoutParams(lp);
+        return b;
+    }
+
+    private android.graphics.drawable.GradientDrawable face(int fill, int stroke) {
+        android.graphics.drawable.GradientDrawable d = new android.graphics.drawable.GradientDrawable();
+        d.setColor(fill);
+        d.setCornerRadius(dp(3));
+        d.setStroke(dp(1), stroke);
+        return d;
+    }
+
+    private void setDriveLight(boolean on) {
+        if (driveLight == null) return;
+        android.graphics.drawable.GradientDrawable d = new android.graphics.drawable.GradientDrawable();
+        d.setColor(on ? 0xff22dd44 : 0xff1f3a24);
+        d.setCornerRadius(dp(2));
+        driveLight.setBackground(d);
+    }
+
+    /** Run (AppleWin's F2): restart with the disk in drive 1, or ask for one. */
+    private void runOrReboot() {
+        String path = getPreferences(MODE_PRIVATE).getString("disk_path", null);
+        if (path == null || !new File(path).isFile()) { openDiskPicker(); return; }
+        startGame(new File(path));
+    }
+
+    private void setFullscreen(boolean on) {
+        fullscreen = on;
+        toolbar.setVisibility(on ? View.GONE : View.VISIBLE);
+        if (on) Toast.makeText(this, "Press Back to show the toolbar", Toast.LENGTH_SHORT).show();
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (fullscreen) setFullscreen(false);
+        else super.onBackPressed();
+    }
+
+    private void showHelp() {
+        info("AppleWin help",
+                "Run: restart the Apple with the disk in drive 1.\n"
+                + "Drive 1: insert a disk image (.dsk, .do, .po, .nib, .woz or .zip).\n"
+                + "Full screen: hide this toolbar; press Back to bring it back.\n"
+                + "Debug: the emulator's diagnostic log, for bug reports.\n"
+                + "Setup: the AppleWin configuration.\n\n"
+                + "The arrows and A/B over the screen are the joystick; a Bluetooth controller works too.");
+    }
+
+    /** AppleWin's Configuration dialog, with its tabs. */
+    private void showSetup() {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(16), dp(8), dp(16), dp(8));
+        LinearLayout tabs = new LinearLayout(this);
+        TextView body = new TextView(this);
+        body.setTextSize(14);
+        body.setPadding(0, dp(12), 0, 0);
+        String[] names = { "Configuration", "Input", "Sound", "Disk" };
+        TextView[] tabViews = new TextView[names.length];
+        for (int i = 0; i < names.length; i++) {
+            final int which = i;
+            TextView tab = new TextView(this);
+            tab.setText(names[i]);
+            tab.setTextSize(13);
+            tab.setPadding(dp(10), dp(6), dp(10), dp(6));
+            tab.setOnClickListener(v -> setupTab(which, tabViews, body));
+            tabViews[i] = tab;
+            tabs.addView(tab);
+        }
+        android.widget.HorizontalScrollView tabScroll = new android.widget.HorizontalScrollView(this);
+        tabScroll.addView(tabs);
+        box.addView(tabScroll);
+        box.addView(body);
+        setupTab(0, tabViews, body);
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(box);
+        new AlertDialog.Builder(this)
+                .setTitle("AppleWin Configuration")
+                .setView(scroll)
+                .setPositiveButton("OK", null)
+                .setNeutralButton("Insert disk", (d, w) -> openDiskPicker())
+                .show();
+    }
+
+    private void setupTab(int which, TextView[] tabs, TextView body) {
+        for (int i = 0; i < tabs.length; i++) {
+            tabs[i].setTypeface(Typeface.DEFAULT, i == which ? Typeface.BOLD : Typeface.NORMAL);
+            tabs[i].setBackgroundColor(i == which ? 0x223d8ee6 : Color.TRANSPARENT);
+        }
+        String name = getPreferences(MODE_PRIVATE).getString("disk_name", null);
+        switch (which) {
+            case 1: body.setText("Joystick: the on-screen arrows with A (button 0) and B (button 1), or a Bluetooth controller's d-pad and A/B."); break;
+            case 2: body.setText("Speaker and Mockingboard sound aren't connected on Android yet."); break;
+            case 3: body.setText("Drive 1: " + (name == null ? "empty" : name) + "\nDrive 2: not available on Android yet.\n\nSave states aren't connected yet."); break;
+            default: body.setText("Emulated computer: the AppleWin core's default model.\nVideo: shown at the Apple's own resolution, scaled to fit the screen.\nCore: " + (coreInitialized ? "running" : "not started yet") + ".");
+        }
+    }
+
+    private void info(String title, String text) {
+        TextView content = new TextView(this);
+        content.setText(text);
+        content.setPadding(dp(16), dp(12), dp(16), dp(12));
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(content);
+        new AlertDialog.Builder(this).setTitle(title).setView(scroll).setPositiveButton("OK", null).show();
     }
 
     private void addControl(LinearLayout parent, String label, int button) {
@@ -227,6 +372,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                 }
                 gameLoaded = NativeCore.nativeLoadGame(diskImage.getAbsolutePath());
                 mainHandler.post(() -> {
+                    setDriveLight(gameLoaded);
                     if (gameLoaded) {
                         diskStatus.setText("Running: " + diskImage.getName());
                         startFrames();
