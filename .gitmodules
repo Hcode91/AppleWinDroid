@@ -5,3 +5,6 @@
 	path = android/applewin-core
 	url = https://github.com/FujiNetWIFI/AppleWin.git
 	branch = linux
+[submodule "android/rcheevos"]
+	path = android/rcheevos
+	url = https://github.com/RetroAchievements/rcheevos.git

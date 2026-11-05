@@ -52,6 +52,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     private volatile boolean gameLoaded;
     private volatile String lastJavaError = "";
     private ScheduledFuture<?> frameTask;
+    private RetroAchievements achievements;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -64,7 +65,94 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                         | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
                         | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
         setContentView(createContent());
+        startAchievements();
         showSavedDisk();
+    }
+
+    // RetroAchievements (casual/softcore only): unlocks are shown as toasts, the 🏆 button logs in
+    // or shows progress for the running disk.
+    private void startAchievements() {
+        String version = "1.0";
+        try {
+            version = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+        } catch (Exception ignored) {
+        }
+        achievements = new RetroAchievements(this, coreExecutor, mainHandler, version);
+        achievements.setUi(new RetroAchievements.Ui() {
+            @Override public void onLogin(boolean ok, String message) {
+                Toast.makeText(MainActivity.this, ok ? "RetroAchievements: logged in as " + message
+                        : "RetroAchievements login failed: " + message, Toast.LENGTH_LONG).show();
+            }
+            @Override public void onGame(boolean ok, String message) {
+                if (ok) Toast.makeText(MainActivity.this, "🏆 " + message, Toast.LENGTH_LONG).show();
+                else Toast.makeText(MainActivity.this, "RetroAchievements: " + message, Toast.LENGTH_LONG).show();
+            }
+            @Override public void onUnlock(String title, String description, int points) {
+                Toast.makeText(MainActivity.this, "🏆 Achievement unlocked: " + title + " (" + points + ")\n" + description,
+                        Toast.LENGTH_LONG).show();
+            }
+            @Override public void onNotice(String message) {
+                Toast.makeText(MainActivity.this, message, Toast.LENGTH_LONG).show();
+            }
+        });
+        try {
+            achievements.start();
+        } catch (Throwable error) {
+            lastJavaError = "RetroAchievements: " + error;
+        }
+    }
+
+    private void showAchievements() {
+        achievements.status((name, summary) -> {
+            if (name == null) {
+                showRaLogin();
+                return;
+            }
+            String body = summary.isEmpty()
+                    ? "Load a disk to see its achievements. Not every Apple II disk has a set; the disk image must match the one RetroAchievements lists for the game."
+                    : summary;
+            TextView content = new TextView(this);
+            content.setText("Logged in as " + name + " (casual mode)\n\n" + body);
+            content.setPadding(dp(16), dp(12), dp(16), dp(12));
+            ScrollView scroll = new ScrollView(this);
+            scroll.addView(content);
+            new AlertDialog.Builder(this).setTitle("RetroAchievements").setView(scroll)
+                    .setPositiveButton("OK", null)
+                    .setNegativeButton("Log out", (d, w) -> {
+                        achievements.logout();
+                        Toast.makeText(this, "Logged out of RetroAchievements", Toast.LENGTH_SHORT).show();
+                    })
+                    .show();
+        });
+    }
+
+    private void showRaLogin() {
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        form.setPadding(dp(16), dp(8), dp(16), 0);
+        TextView note = new TextView(this);
+        note.setText("Log in with your retroachievements.org account. Your password is sent once and not saved; the app keeps a login token.");
+        android.widget.EditText user = new android.widget.EditText(this);
+        user.setHint("Username");
+        user.setSingleLine(true);
+        String saved = achievements.savedUser();
+        if (saved != null) user.setText(saved);
+        android.widget.EditText password = new android.widget.EditText(this);
+        password.setHint("Password");
+        password.setSingleLine(true);
+        password.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        form.addView(note);
+        form.addView(user);
+        form.addView(password);
+        new AlertDialog.Builder(this).setTitle("RetroAchievements").setView(form)
+                .setPositiveButton("Log in", (d, w) -> {
+                    String u = user.getText().toString().trim(), p = password.getText().toString();
+                    if (u.isEmpty() || p.isEmpty()) return;
+                    Toast.makeText(this, "Logging in…", Toast.LENGTH_SHORT).show();
+                    achievements.login(u, p);
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     // Laid out like AppleWin on Windows: the Apple screen on the left and AppleWin's vertical
@@ -111,6 +199,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         bar.addView(toolButton("□", "Full screen", v -> setFullscreen(true)));
         bar.addView(toolButton("🐞", "Debug", v -> showDiagnostics()));
         bar.addView(toolButton("⚙", "Setup", v -> showSetup()));
+        bar.addView(toolButton("🏆", "Achievements", v -> showAchievements()));
         LinearLayout lights = new LinearLayout(this);
         lights.setGravity(Gravity.CENTER);
         lights.setPadding(0, dp(10), 0, dp(4));
@@ -208,7 +297,8 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                 + "Drive 1: insert a disk image (.dsk, .do, .po, .nib, .woz or .zip).\n"
                 + "Full screen: hide this toolbar; press Back to bring it back.\n"
                 + "Debug: the emulator's diagnostic log, for bug reports.\n"
-                + "Setup: the AppleWin configuration.\n\n"
+                + "Setup: the AppleWin configuration.\n"
+                + "🏆: RetroAchievements log in and progress (casual mode).\n\n"
                 + "The arrows and A/B over the screen are the joystick; a Bluetooth controller works too.");
     }
 
@@ -497,6 +587,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             if (coreInitialized) NativeCore.nativeStop();
         });
         coreExecutor.shutdown();
+        if (achievements != null) achievements.shutdown();
         super.onDestroy();
     }
 
