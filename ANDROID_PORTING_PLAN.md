@@ -29,6 +29,8 @@ The native-core build pins the related [FujiNetWIFI/AppleWin `linux` branch](htt
 
 The Android achievement client is casual/softcore only. Do not add a hardcore flag, mode selector, enforcement checks, or a path that could enable hardcore. The Windows implementation's hardcore behavior is out of scope for Android.
 
+**Status (milestone 5, first slice):** `rcheevos` v12.5.0 is the `android/rcheevos` submodule, built as a static library into the JNI bridge (`android/app-shell/native/achievements.cpp`). It identifies the disk with the Apple II hash, reads main RAM ($0000-$FFFF) from the core, and processes achievements every frame. HTTP goes through `RetroAchievements.java` (HttpURLConnection); only the username and login token are stored. The 🏆 toolbar button logs in, shows progress, and logs out; unlocks appear as toasts. The single `rc_client_set_hardcore_enabled(g_client, 0)` call switches rc_client's default off at creation and is the only allowed mention (CI checks this). Not done yet: auxiliary RAM (128K titles), leaderboards and rich presence display, and an in-game overlay.
+
 ## First implementation target
 
 The first Android frontend slice now connects disk selection, frame rendering, and joypad input to the ARM64 libretro core. Complete it with audio, save/load states, ROM handling, and a packaged native build before expanding machine and RetroAchievements support.

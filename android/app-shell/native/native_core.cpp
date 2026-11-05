@@ -4,6 +4,7 @@
 #include <android/native_window_jni.h>
 
 #include "libretro.h"
+#include "achievements.h"
 
 #include <algorithm>
 #include <atomic>
@@ -131,7 +132,7 @@ bool environment(unsigned command, void *data) {
         case RETRO_ENVIRONMENT_SHUTDOWN:
             return true;
         case RETRO_ENVIRONMENT_SET_SUPPORT_ACHIEVEMENTS:
-            return false;
+            return true;
         default:
             return false;
     }
@@ -241,6 +242,7 @@ Java_com_buddyapps_applewindroid_NativeCore_nativeLoadGame(JNIEnv *env, jclass, 
     g_game_loaded = retro_load_game(&game);
     append_diagnostic(std::string("retro_load_game returned ") + (g_game_loaded ? "true\n" : "false\n"));
     if (g_game_loaded) {
+        achievements::on_game_loaded(game_path.c_str());
         retro_system_av_info av_info{};
         retro_get_system_av_info(&av_info);
         g_width = av_info.geometry.base_width;
@@ -262,7 +264,10 @@ Java_com_buddyapps_applewindroid_NativeCore_nativeGetDiagnostics(JNIEnv *env, jc
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_buddyapps_applewindroid_NativeCore_nativeRunFrame(JNIEnv *, jclass) {
-    if (g_initialized && g_game_loaded) retro_run();
+    if (g_initialized && g_game_loaded) {
+        retro_run();
+        achievements::on_frame();
+    }
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -287,7 +292,10 @@ Java_com_buddyapps_applewindroid_NativeCore_nativeSetButton(JNIEnv *, jclass, ji
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_buddyapps_applewindroid_NativeCore_nativeStop(JNIEnv *, jclass) {
-    if (g_game_loaded) retro_unload_game();
+    if (g_game_loaded) {
+        achievements::on_game_unloaded();
+        retro_unload_game();
+    }
     g_game_loaded = false;
     if (g_initialized) retro_deinit();
     g_initialized = false;
