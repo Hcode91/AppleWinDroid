@@ -26,14 +26,14 @@ jobs:
       - name: Enforce casual-only Android achievements
         run: |
           # The only allowed mention is the line that switches rc_client's default off.
-          hits=$(rg -ni 'hard.?core' android/app-shell/java android/app-shell/native \
-            | grep -v 'achievements.cpp:[0-9]*:    rc_client_set_hardcore_enabled(g_client, 0);$' || true)
+          hits=$(grep -rniE 'hard.?core' android/app-shell/java android/app-shell/native \
+            | grep -v 'native/achievements.cpp:[0-9]*:    rc_client_set_hardcore_enabled(g_client, 0);$' || true)
           if [ -n "$hits" ]; then
             echo "$hits"
             echo "Android achievements must remain casual/softcore only."
             exit 1
           fi
-          rg -q 'rc_client_set_hardcore_enabled\(g_client, 0\);' android/app-shell/native/achievements.cpp \
+          grep -qF 'rc_client_set_hardcore_enabled(g_client, 0);' android/app-shell/native/achievements.cpp \
             || { echo "rc_client must be switched to casual mode at creation."; exit 1; }
 
       - name: Install host build dependencies
